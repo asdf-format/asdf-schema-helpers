@@ -33,14 +33,18 @@ def pytest_addoption(parser):
         type="bool",
         default=True
     )
-    parser.addoption('--asdf-schema', action='store_true',
-        help='Enable ASDF schema tests')
+    parser.addoption(
+        '--asdf-schema',
+        action='store_true',
+        help='Enable ASDF schema tests'
+    )
 
 
 class AsdfSchemaFile(pytest.File):
     @classmethod
     def from_parent(cls, parent, *, fspath, skip_examples=False,
-        ignore_unrecognized_tag=False, ignore_version_mismatch=False, **kwargs):
+                    ignore_unrecognized_tag=False, ignore_version_mismatch=False,
+                    **kwargs):
         if hasattr(super(), "from_parent"):
             result = super().from_parent(parent, fspath=fspath, **kwargs)
         else:
@@ -71,9 +75,9 @@ class AsdfSchemaFile(pytest.File):
             schema_tree = yaml.safe_load(fd)
 
         for node in treeutil.iter_tree(schema_tree):
-            if (isinstance(node, dict) and
-                'examples' in node and
-                isinstance(node['examples'], list)):
+            if (isinstance(node, dict)
+                    and isinstance(node['examples'], list)
+                    and 'examples' in node):
                 for desc, example in node['examples']:
                     yield example
 
@@ -138,7 +142,8 @@ def parse_schema_filename(filename):
 class AsdfSchemaExampleItem(pytest.Item):
     @classmethod
     def from_parent(cls, parent, schema_path, example,
-        ignore_unrecognized_tag=False, ignore_version_mismatch=False, **kwargs):
+                    ignore_unrecognized_tag=False, ignore_version_mismatch=False,
+                    **kwargs):
         test_name = "{}-example".format(schema_path)
         if hasattr(super(), "from_parent"):
             result = super().from_parent(parent, name=test_name, **kwargs)
@@ -227,7 +232,7 @@ def pytest_collect_file(path, parent):
     ignore_version_mismatch = parent.config.getini('asdf_ignore_version_mismatch')
 
     schema_roots = [os.path.join(str(parent.config.rootdir), os.path.normpath(root))
-                        for root in schema_roots]
+                    for root in schema_roots]
 
     if path.ext != '.yaml':
         return None
