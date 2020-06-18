@@ -15,31 +15,25 @@ import numpy as np
 
 def pytest_addoption(parser):
     parser.addini(
-        "asdf_schema_root", "Root path indicating where schemas are stored")
+        "asdf_schema_location", "Root path indicating where schemas are stored")
     parser.addini(
-        "asdf_schema_skip_names", "Base names of files to skip in schema tests")
+        "asdf_skip_schemas", "Base names of files to skip in schema tests")
     parser.addini(
-        "asdf_schema_skip_examples",
+        "asdf_skip_schema_examples",
         "Base names of schemas whose examples should not be tested")
     parser.addini(
-        "asdf_schema_tests_enabled",
-        "Controls whether schema tests are enabled by default",
-        type="bool",
-        default=False,
-    )
-    parser.addini(
-        "asdf_schema_ignore_unrecognized_tag",
+        "asdf_ignore_unrecognized_tag",
         "Set to true to disable warnings when tag serializers are missing",
         type="bool",
         default=False,
     )
     parser.addini(
-        "asdf_schema_ignore_version_mismatch",
+        "asdf_ignore_version_mismatch",
         "Set to true to disable warnings when missing explicit support for a tag",
         type="bool",
         default=True
     )
-    parser.addoption('--asdf-tests', action='store_true',
+    parser.addoption('--asdf-schema', action='store_true',
         help='Enable ASDF schema tests')
 
 
@@ -220,18 +214,17 @@ class AsdfSchemaExampleItem(pytest.Item):
 
 
 def pytest_collect_file(path, parent):
-    if not (parent.config.getini('asdf_schema_tests_enabled') or
-            parent.config.getoption('asdf_tests')):
+    if not parent.config.getoption('asdf_schema'):
         return
 
-    schema_roots = parent.config.getini('asdf_schema_root').split()
+    schema_roots = parent.config.getini('asdf_schema_location').split()
     if not schema_roots:
         return
 
-    skip_names = parent.config.getini('asdf_schema_skip_names')
-    skip_examples = parent.config.getini('asdf_schema_skip_examples')
-    ignore_unrecognized_tag = parent.config.getini('asdf_schema_ignore_unrecognized_tag')
-    ignore_version_mismatch = parent.config.getini('asdf_schema_ignore_version_mismatch')
+    skip_names = parent.config.getini('asdf_skip_schemas')
+    skip_examples = parent.config.getini('asdf_skip_schema_examples')
+    ignore_unrecognized_tag = parent.config.getini('asdf_ignore_unrecognized_tag')
+    ignore_version_mismatch = parent.config.getini('asdf_ignore_version_mismatch')
 
     schema_roots = [os.path.join(str(parent.config.rootdir), os.path.normpath(root))
                         for root in schema_roots]
