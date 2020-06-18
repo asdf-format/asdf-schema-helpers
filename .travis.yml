@@ -1,0 +1,21 @@
+os: linux
+dist: xenial
+language: python
+python: "3.8"
+
+jobs:
+  include:
+    - name: Build wheel and sdist
+      env: TOXENV=build
+
+    - name: Code style check
+      env: TOXENV=style
+
+    - name: Twine check
+      env: TOXENV=twine
+
+install:
+  - pip install tox
+
+script:
+  - tox
