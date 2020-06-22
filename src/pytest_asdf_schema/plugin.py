@@ -15,38 +15,36 @@ import numpy as np
 
 def pytest_addoption(parser):
     parser.addini(
-        "asdf_schema_root", "Root path indicating where schemas are stored")
+        "asdf_schema_location", "Root path indicating where schemas are stored")
     parser.addini(
-        "asdf_schema_skip_names", "Base names of files to skip in schema tests")
+        "asdf_skip_schemas", "Base names of files to skip in schema tests")
     parser.addini(
-        "asdf_schema_skip_examples",
+        "asdf_skip_schema_examples",
         "Base names of schemas whose examples should not be tested")
     parser.addini(
-        "asdf_schema_tests_enabled",
-        "Controls whether schema tests are enabled by default",
-        type="bool",
-        default=False,
-    )
-    parser.addini(
-        "asdf_schema_ignore_unrecognized_tag",
+        "asdf_ignore_unrecognized_tag",
         "Set to true to disable warnings when tag serializers are missing",
         type="bool",
         default=False,
     )
     parser.addini(
-        "asdf_schema_ignore_version_mismatch",
+        "asdf_ignore_version_mismatch",
         "Set to true to disable warnings when missing explicit support for a tag",
         type="bool",
         default=True
     )
-    parser.addoption('--asdf-tests', action='store_true',
-        help='Enable ASDF schema tests')
+    parser.addoption(
+        '--asdf-schema',
+        action='store_true',
+        help='Enable ASDF schema tests'
+    )
 
 
 class AsdfSchemaFile(pytest.File):
     @classmethod
     def from_parent(cls, parent, *, fspath, skip_examples=False,
-        ignore_unrecognized_tag=False, ignore_version_mismatch=False, **kwargs):
+                    ignore_unrecognized_tag=False, ignore_version_mismatch=False,
+                    **kwargs):
         if hasattr(super(), "from_parent"):
             result = super().from_parent(parent, fspath=fspath, **kwargs)
         else:
@@ -77,9 +75,9 @@ class AsdfSchemaFile(pytest.File):
             schema_tree = yaml.safe_load(fd)
 
         for node in treeutil.iter_tree(schema_tree):
-            if (isinstance(node, dict) and
-                'examples' in node and
-                isinstance(node['examples'], list)):
+            if (isinstance(node, dict)
+                    and isinstance(node['examples'], list)
+                    and 'examples' in node):
                 for desc, example in node['examples']:
                     yield example
 
@@ -144,7 +142,8 @@ def parse_schema_filename(filename):
 class AsdfSchemaExampleItem(pytest.Item):
     @classmethod
     def from_parent(cls, parent, schema_path, example,
-        ignore_unrecognized_tag=False, ignore_version_mismatch=False, **kwargs):
+                    ignore_unrecognized_tag=False, ignore_version_mismatch=False,
+                    **kwargs):
         test_name = "{}-example".format(schema_path)
         if hasattr(super(), "from_parent"):
             result = super().from_parent(parent, name=test_name, **kwargs)
@@ -220,21 +219,20 @@ class AsdfSchemaExampleItem(pytest.Item):
 
 
 def pytest_collect_file(path, parent):
-    if not (parent.config.getini('asdf_schema_tests_enabled') or
-            parent.config.getoption('asdf_tests')):
+    if not parent.config.getoption('asdf_schema'):
         return
 
-    schema_roots = parent.config.getini('asdf_schema_root').split()
+    schema_roots = parent.config.getini('asdf_schema_location').split()
     if not schema_roots:
         return
 
-    skip_names = parent.config.getini('asdf_schema_skip_names')
-    skip_examples = parent.config.getini('asdf_schema_skip_examples')
-    ignore_unrecognized_tag = parent.config.getini('asdf_schema_ignore_unrecognized_tag')
-    ignore_version_mismatch = parent.config.getini('asdf_schema_ignore_version_mismatch')
+    skip_names = parent.config.getini('asdf_skip_schemas')
+    skip_examples = parent.config.getini('asdf_skip_schema_examples')
+    ignore_unrecognized_tag = parent.config.getini('asdf_ignore_unrecognized_tag')
+    ignore_version_mismatch = parent.config.getini('asdf_ignore_version_mismatch')
 
     schema_roots = [os.path.join(str(parent.config.rootdir), os.path.normpath(root))
-                        for root in schema_roots]
+                    for root in schema_roots]
 
     if path.ext != '.yaml':
         return None
