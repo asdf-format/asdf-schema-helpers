@@ -1,5 +1,3 @@
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
-# -*- coding: utf-8 -*-
 import io
 import os
 from importlib.util import find_spec
@@ -22,12 +20,6 @@ def pytest_addoption(parser):
         "asdf_schema_skip_examples",
         "Base names of schemas whose examples should not be tested")
     parser.addini(
-        "asdf_schema_tests_enabled",
-        "Controls whether schema tests are enabled by default",
-        type="bool",
-        default=False,
-    )
-    parser.addini(
         "asdf_schema_ignore_unrecognized_tag",
         "Set to true to disable warnings when tag serializers are missing",
         type="bool",
@@ -39,14 +31,18 @@ def pytest_addoption(parser):
         type="bool",
         default=True
     )
-    parser.addoption('--asdf-tests', action='store_true',
-        help='Enable ASDF schema tests')
+    parser.addoption(
+        "--asdf-schema",
+        action="store_true",
+        help="Enable ASDF schema tests"
+    )
 
 
 class AsdfSchemaFile(pytest.File):
     @classmethod
     def from_parent(cls, parent, *, fspath, skip_examples=False,
-        ignore_unrecognized_tag=False, ignore_version_mismatch=False, **kwargs):
+                    ignore_unrecognized_tag=False, ignore_version_mismatch=False,
+                    **kwargs):
         if hasattr(super(), "from_parent"):
             result = super().from_parent(parent, fspath=fspath, **kwargs)
         else:
@@ -77,9 +73,9 @@ class AsdfSchemaFile(pytest.File):
             schema_tree = yaml.safe_load(fd)
 
         for node in treeutil.iter_tree(schema_tree):
-            if (isinstance(node, dict) and
-                'examples' in node and
-                isinstance(node['examples'], list)):
+            if (isinstance(node, dict)
+                    and 'examples' in node
+                    and isinstance(node['examples'], list)):
                 for desc, example in node['examples']:
                     yield example
 
@@ -143,8 +139,8 @@ def parse_schema_filename(filename):
 
 class AsdfSchemaExampleItem(pytest.Item):
     @classmethod
-    def from_parent(cls, parent, schema_path, example,
-        ignore_unrecognized_tag=False, ignore_version_mismatch=False, **kwargs):
+    def from_parent(cls, parent, schema_path, example, ignore_unrecognized_tag=False,
+                    ignore_version_mismatch=False, **kwargs):
         test_name = "{}-example".format(schema_path)
         if hasattr(super(), "from_parent"):
             result = super().from_parent(parent, name=test_name, **kwargs)
@@ -220,8 +216,7 @@ class AsdfSchemaExampleItem(pytest.Item):
 
 
 def pytest_collect_file(path, parent):
-    if not (parent.config.getini('asdf_schema_tests_enabled') or
-            parent.config.getoption('asdf_tests')):
+    if not parent.config.getoption('asdf_schema'):
         return
 
     schema_roots = parent.config.getini('asdf_schema_root').split()
@@ -234,7 +229,7 @@ def pytest_collect_file(path, parent):
     ignore_version_mismatch = parent.config.getini('asdf_schema_ignore_version_mismatch')
 
     schema_roots = [os.path.join(str(parent.config.rootdir), os.path.normpath(root))
-                        for root in schema_roots]
+                    for root in schema_roots]
 
     if path.ext != '.yaml':
         return None
