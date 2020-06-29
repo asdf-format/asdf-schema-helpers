@@ -140,6 +140,8 @@ def assert_schema_correct(path):
     assert "description" in schema, f"{path.name} is missing description key"
     assert len(schema["description"].strip()) > 0, f"{path.name} description must have content"
 
+    # The following two depend on having a full list of schemas.  Any idea how
+    # to do this?
     # assert len(id_to_schema(schema["id"])) == 1, f"{path.name} does not have a unique id"
 
     # if "tag" in schema:
