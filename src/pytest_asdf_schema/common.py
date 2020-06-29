@@ -1,38 +1,13 @@
 from pathlib import Path
 import re
-from distutils.version import StrictVersion
 import yaml
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
-
-ROOT_PATH = Path(__file__).parent.parent
-SCHEMAS_PATH = ROOT_PATH / "schemas" / "stsci.edu" / "asdf"
-DOCS_PATH = ROOT_PATH / "docs" / "source"
-DOCS_SCHEMAS_PATH = DOCS_PATH / "schemas"
-YAML_SCHEMA_PATH = ROOT_PATH / "schemas" / "stsci.edu" / "yaml-schema"
-
-VERSION_MAP_PATHS = list(SCHEMAS_PATH.glob("version_map-*.yaml"))
 
 VALID_YAML_VERSIONS = {"1.1"}
 VALID_FILE_FORMAT_VERSIONS = {"1.0.0"}
 
 VALID_SCHEMA_FILENAME_RE = re.compile(r"[a-z0-9_]+-[0-9]+\.[0-9]+\.[0-9]+\.yaml")
-
-DEPRECATED_NAMES = {
-    "transform/domain",
-    "wcs/frame",
-    "wcs/celestial_frame",
-    "wcs/composite_frame",
-    "wcs/icrs_coord",
-    "wcs/spectral_frame",
-    "wcs/step",
-    "wcs/wcs",
-    "transform/label_mapper",
-    "transform/regions_selector",
-}
-
-DEPRECATED_ID_BASES = {f"http://stsci.edu/schemas/asdf/{name}" for name in DEPRECATED_NAMES}
-DEPRECATED_TAG_BASES = {f"tag:stsci.edu:asdf/{name}" for name in DEPRECATED_NAMES}
 
 METASCHEMA_ID = "http://stsci.edu/schemas/yaml-schema/draft-01"
 
@@ -65,52 +40,14 @@ def yaml_tag_to_id(yaml_tag):
     return "http://stsci.edu/schemas/asdf/" + yaml_tag.replace("!", "")
 
 
-def path_to_tag(path):
-    relative_stem = str((path.parent / path.stem).relative_to(SCHEMAS_PATH))
-    return "tag:stsci.edu:asdf/" + relative_stem
-
-
-def tag_to_path(tag):
-    assert tag.startswith("tag:stsci.edu:asdf/")
-
-    return SCHEMAS_PATH / f"""{tag.split("tag:stsci.edu:asdf/")[-1]}.yaml"""
-
-
 def tag_to_id(tag):
     assert tag.startswith("tag:stsci.edu:asdf/")
 
     return "http://stsci.edu/schemas/asdf/" + tag.split("tag:stsci.edu:asdf/")[-1]
 
 
-def id_to_path(id):
-    assert id.startswith("http://stsci.edu/schemas/asdf/")
-
-    return SCHEMAS_PATH / f"""{id.split("http://stsci.edu/schemas/asdf/")[-1]}.yaml"""
-
-
-def path_to_id(path):
-    relative_stem = str((path.parent / path.stem).relative_to(SCHEMAS_PATH))
-    return "http://stsci.edu/schemas/asdf/" + relative_stem
-
-
 def list_schema_paths(path):
     return sorted(p for p in path.glob("**/*.yaml") if not p.name.startswith("version_map-"))
-
-
-def list_latest_schema_paths(path):
-    paths = list_schema_paths(path)
-
-    latest_by_id_base = {}
-    for path in paths:
-        schema_id = path_to_id(path)
-        id_base, version = split_id(schema_id)
-        if id_base in latest_by_id_base:
-            if StrictVersion(version) > StrictVersion(latest_by_id_base[id_base][0]):
-                latest_by_id_base[id_base] = (version, path)
-        else:
-            latest_by_id_base[id_base] = (version, path)
-
-    return sorted([p for _, p in latest_by_id_base.values()])
 
 
 def ref_to_id(schema_id, ref):
@@ -149,3 +86,73 @@ def list_description_ids(schema):
                 ref = "http://stsci.edu/schemas/asdf/" + ref
             result.add(ref)
     return result
+
+
+def tag_to_schema(schemas):
+    result = {}
+    for schema in schemas:
+        if "tag" in schema:
+            if schema["tag"] not in result:
+                result[schema["tag"]] = []
+            result[schema["tag"]].append(schema)
+    return result
+
+
+def id_to_schema(schemas):
+    result = {}
+    for schema in schemas:
+        if "id" in schema:
+            if schema["id"] not in result:
+                result[schema["id"]] = []
+            result[schema["id"]].append(schema)
+    return result
+
+
+def assert_schema_correct(path):
+    """Assertion helper for schema checks"""
+    import asdf
+
+    __tracebackhide__ = True
+
+    resolve = asdf.extension.default_extensions.resolver
+
+    assert VALID_SCHEMA_FILENAME_RE.match(path.name) is not None, f"{path.name} is an invalid schema filename"
+
+    assert_yaml_header_and_footer(path)
+
+    schema = load_yaml(path)
+
+    assert "$schema" in schema, f"{path.name} is missing $schema key"
+    assert schema["$schema"] == METASCHEMA_ID, f"{path.name} has wrong $schema value (expected {METASCHEMA_ID})"
+
+    assert "id" in schema, f"{path.name} is missing id key"
+
+    resolved_path_from_id = Path(urlparse(resolve(schema["id"])).path).resolve()
+    assert path.samefile(resolved_path_from_id)
+
+    if "tag" in schema:
+        resolved_path_from_tag = Path(urlparse(resolve(schema["tag"])).path).resolve()
+        assert path.samefile(resolved_path_from_tag)
+
+    assert "title" in schema, f"{path.name} is missing title key"
+    assert len(schema["title"].strip()) > 0, f"{path.name} title must have content"
+
+    assert "description" in schema, f"{path.name} is missing description key"
+    assert len(schema["description"].strip()) > 0, f"{path.name} description must have content"
+
+    # assert len(id_to_schema(schema["id"])) == 1, f"{path.name} does not have a unique id"
+
+    # if "tag" in schema:
+    #     assert len(tag_to_schema[schema["tag"]]) == 1, f"{path.name} does not have a unique tag"
+
+    id_base, _ = split_id(schema["id"])
+    for example_id in list_example_ids(schema):
+        example_id_base, _ = split_id(example_id)
+        if example_id_base == id_base and example_id != schema["id"]:
+            assert False, f"{path.name} contains an example with an outdated tag"
+
+    for description_id in list_description_ids(schema):
+        if len(description_id.rsplit("-", 1)) > 1:
+            description_id_base, _ = split_id(description_id)
+            if description_id_base == id_base and description_id != schema["id"]:
+                assert False, f"{path.name} descriptioon contains an outdated ref"

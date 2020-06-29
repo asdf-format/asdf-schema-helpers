@@ -2,11 +2,14 @@ import io
 import os
 from importlib.util import find_spec
 from pkg_resources import parse_version
+from pathlib import Path
 
 import yaml
 import pytest
 
 import numpy as np
+
+from . import common
 
 # Avoid all imports of asdf at this level in order to avoid circular imports
 
@@ -100,6 +103,7 @@ class AsdfSchemaItem(pytest.Item):
             self.schema_path, resolver=default_extensions.resolver,
             resolve_references=True)
         schema.check_schema(schema_tree)
+        common.assert_schema_correct(Path(self.schema_path))
 
 
 ASTROPY_4_0_TAGS = {
