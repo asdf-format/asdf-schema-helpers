@@ -1,0 +1,43 @@
+name: ASDF Schema Helpers CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  pull_request:
+    branches:
+
+jobs:
+  tox:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - name: Build wheel and sdist
+            python-version: 3.9
+            os: ubuntu-latest
+            toxenv: build
+
+          - name: Code style check
+            python-version: 3.9
+            os: ubuntu-latest
+            toxenv: style
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install tox
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install tox
+      - name: Run tox
+        run: tox -e ${{ matrix.toxenv }}
